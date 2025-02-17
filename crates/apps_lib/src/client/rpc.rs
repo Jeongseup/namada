@@ -11,6 +11,7 @@ use masp_primitives::merkle_tree::MerklePath;
 use masp_primitives::sapling::Node;
 use masp_primitives::transaction::components::I128Sum;
 use masp_primitives::zip32::ExtendedFullViewingKey;
+use namada_core::dec::Dec;
 use namada_core::masp::{BalanceOwner, MaspEpoch};
 use namada_core::token::Amount;
 use namada_sdk::address::{Address, InternalAddress, MASP};
@@ -18,7 +19,6 @@ use namada_sdk::borsh::BorshDeserialize;
 use namada_sdk::chain::{BlockHeight, Epoch};
 use namada_sdk::collections::{HashMap, HashSet};
 use namada_sdk::control_flow::time::{Duration, Instant};
-use namada_sdk::dec::Dec;
 use namada_sdk::events::Event;
 use namada_sdk::governance::parameters::GovernanceParameters;
 use namada_sdk::governance::pgf::parameters::PgfParameters;
@@ -1506,6 +1506,19 @@ pub async fn query_rewards<C: Client + Sync>(
 ) -> token::Amount {
     unwrap_sdk_result(
         rpc::query_rewards(client, source, validator, epoch).await,
+    )
+}
+
+pub async fn query_validator_rewards_product<C: Client + Sync>(
+    client: &C,
+    validator: &Address,
+    epoch: Option<Epoch>,
+) -> Vec<(Epoch, Dec)> {
+    unwrap_client_response::<C, _>(
+        RPC.vp()
+            .pos()
+            .rewards_products(client, validator, &epoch)
+            .await,
     )
 }
 

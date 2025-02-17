@@ -7,6 +7,7 @@ use namada_core::address::Address;
 use namada_core::arith::{self, checked};
 use namada_core::chain::Epoch;
 use namada_core::collections::{HashMap, HashSet};
+use namada_core::dec::Dec;
 use namada_core::key::{common, tm_consensus_key_raw_hash};
 use namada_core::token;
 use namada_proof_of_stake::parameters::PosParams;
@@ -34,7 +35,9 @@ use namada_proof_of_stake::types::{
     LivenessInfo, Slash, ValidatorLiveness, ValidatorMetaData,
     WeightedValidator,
 };
-use namada_proof_of_stake::{bond_amount, query_reward_tokens};
+use namada_proof_of_stake::{
+    bond_amount, query_reward_tokens, query_validator_rewards_products,
+};
 use namada_state::{DBIter, KeySeg, StorageHasher, StorageRead, DB};
 use namada_storage::collections::lazy_map;
 use namada_storage::{OptionExt, ResultExt};
@@ -107,6 +110,9 @@ router! {POS,
 
     ( "rewards" / [validator: Address] / [source: opt Address] / [epoch: opt Epoch] )
         -> token::Amount = rewards,
+
+    ( "rewards_products" / [validator: Address] / [epoch: opt Epoch])
+    -> Vec<(Epoch, Dec)> = rewards_products,
 
     ( "bond_with_slashing" / [source: Address] / [validator: Address] / [epoch: opt Epoch] )
         -> token::Amount = bond_with_slashing,
@@ -586,6 +592,20 @@ where
     Ok(total)
 }
 
+fn rewards_products<D, H, V, T>(
+    ctx: RequestCtx<'_, D, H, V, T>,
+    validator: Address,
+    epoch: Option<Epoch>,
+) -> namada_storage::Result<Vec<(Epoch, Dec)>>
+where
+    D: 'static + DB + for<'iter> DBIter<'iter> + Sync,
+    H: 'static + StorageHasher + Sync,
+{
+    query_validator_rewards_products::<_, governance::Store<_>>(
+        ctx.state, &validator, epoch,
+    )
+}
+
 fn rewards<D, H, V, T>(
     ctx: RequestCtx<'_, D, H, V, T>,
     validator: Address,
@@ -934,12 +954,10 @@ mod test {
         };
         let result = POS.handle(ctx, &request);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Invalid Tendermint address")
-        )
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid Tendermint address"))
     }
 
     // Helpers for test_rewards_query
